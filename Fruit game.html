@@ -2,7 +2,9 @@
 <head>
   <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/415/415733.png">
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/415/415733.png">
-
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff4d88">
+  
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fruit Cutter Pro Extreme</title>
@@ -140,5 +142,11 @@ function animate(){
   requestAnimationFrame(animate);
 }
 animate();
+    <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+  
 </script></body>
 </html>
