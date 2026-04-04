@@ -1,0 +1,15 @@
+{
+  "name": "Fruit Cutter Pro",
+  "short_name": "FruitCutter",
+  "start_url": "Fruit game.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#ff4d88",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/415/415733.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
