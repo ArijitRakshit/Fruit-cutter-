@@ -1,0 +1,141 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fruit Cutter Pro Extreme</title>
+  <style>
+    body { margin:0; overflow:hidden; background:#000; font-family:Arial, sans-serif; cursor:none; }
+    canvas { display:block; }
+    #ui { position:absolute; top:20px; left:20px; color:#ff4d88; font-size:22px; text-shadow:0 0 10px #ff4d88; z-index:2; }
+    #menu, #overlay {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      flex-direction:column; color:white; background:rgba(0,0,0,0.55); z-index:3;
+    }
+    button {
+      padding:12px 22px; border:none; border-radius:12px; font-size:20px;
+      margin-top:16px; cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">LEVEL: <span id="level">1</span><br>SCORE: <span id="score">0</span><br>BEST: <span id="best">1</span></div>
+  <div id="menu">
+    <h1>🍉 Fruit Cutter Pro</h1>
+    <p>Slice fruits, avoid bombs, survive boss levels!</p>
+    <button onclick="startGame()">▶ Start Game</button>
+  </div>
+  <div id="overlay" style="display:none"></div>
+  <canvas id="game"></canvas><script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const ui = {
+  level: document.getElementById('level'),
+  score: document.getElementById('score'),
+  best: document.getElementById('best'),
+  menu: document.getElementById('menu'),
+  overlay: document.getElementById('overlay')
+};
+canvas.width = innerWidth; canvas.height = innerHeight;
+
+let level=1, score=0, best=+localStorage.getItem('fruit_best')||1;
+let items=[], particles=[], combo=0, gameRunning=false, mouse={x:0,y:0}, knifeRot=0;
+ui.best.textContent = best;
+
+const fruits=['🍎','🍉','🍓','🥭','🍍','🥝'];
+
+class Item {
+  constructor(){
+    this.isBomb = Math.random() < 0.08 + level*0.015;
+    this.boss = level % 10 === 0 && Math.random() < 0.2;
+    this.icon = this.isBomb ? '💣' : (this.boss ? '🍉' : fruits[Math.floor(Math.random()*fruits.length)]);
+    this.size = this.boss ? 120 : Math.max(35, 70-level);
+    this.x = Math.random()*(canvas.width-100)+50;
+    this.y = canvas.height+50;
+    this.vx = (Math.random()-0.5)*(2+level*0.4);
+    this.vy = -(8+Math.random()*4+level*0.4);
+    this.g = 0.12 + level*0.01;
+    this.rot = 0; this.rv = (Math.random()-0.5)*0.2;
+  }
+  update(){ this.vy += this.g; this.x += this.vx; this.y += this.vy; this.rot += this.rv; }
+  draw(){
+    ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(this.rot);
+    ctx.font = `${this.size}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(this.icon,0,0); ctx.restore();
+  }
+}
+
+function spawnParticles(x,y){
+  for(let i=0;i<10;i++) particles.push({x,y,dx:Math.random()*6-3,dy:Math.random()*6-3,life:30});
+}
+
+function updateParticles(){
+  particles.forEach((p,i)=>{
+    p.x += p.dx; p.y += p.dy; p.life--;
+    ctx.font='18px Arial'; ctx.fillText('✨', p.x, p.y);
+    if(p.life<=0) particles.splice(i,1);
+  });
+}
+
+function startGame(){
+  ui.menu.style.display='none';
+  ui.overlay.style.display='none';
+  level=1; score=0; combo=0; items=[]; particles=[]; gameRunning=true;
+}
+
+function gameOver(){
+  gameRunning=false;
+  if(level>best){ best=level; localStorage.setItem('fruit_best', best); ui.best.textContent=best; }
+  ui.overlay.style.display='flex';
+  ui.overlay.innerHTML = `<h1>💥 Game Over</h1><p>Final Level: ${level}<br>Score: ${score}</p><button onclick="startGame()">🔁 Restart</button>`;
+}
+
+function handleMove(e){
+  if(!gameRunning) return;
+  e.preventDefault?.();
+  mouse.x = e.touches ? e.touches[0].clientX : e.clientX;
+  mouse.y = e.touches ? e.touches[0].clientY : e.clientY;
+  knifeRot += 0.4;
+
+  items.forEach((it,i)=>{
+    if(Math.hypot(it.x-mouse.x,it.y-mouse.y) < it.size/1.5){
+      if(it.isBomb) return gameOver();
+      spawnParticles(it.x,it.y);
+      items.splice(i,1);
+      combo++;
+      score += 10 + combo*5 + (it.boss ? 50 : 0);
+      ui.score.textContent = score;
+      if(score >= level*100){ level++; ui.level.textContent = level; }
+      clearTimeout(window.comboReset);
+      window.comboReset = setTimeout(()=>combo=0, 300);
+    }
+  });
+}
+
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('touchmove', handleMove, {passive:false});
+
+function animate(){
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  if(gameRunning){
+    if(Math.random() < 0.03 + level*0.002) items.push(new Item());
+    items.forEach((it,i)=>{
+      it.update(); it.draw();
+      if(it.y > canvas.height+120) items.splice(i,1);
+    });
+
+    ctx.save();
+    ctx.translate(mouse.x, mouse.y);
+    ctx.rotate(knifeRot);
+    ctx.font='42px Arial';
+    ctx.fillText('🔪',0,0);
+    ctx.restore();
+  }
+
+  updateParticles();
+  requestAnimationFrame(animate);
+}
+animate();
+</script></body>
+</html>
