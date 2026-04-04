@@ -1,7 +1,7 @@
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open('fruit-store').then((cache) => cache.addAll([
-      'Fruit game.html',
+      'index.html',
       'manifest.json'
     ]))
   );
