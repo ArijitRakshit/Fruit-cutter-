@@ -12,12 +12,13 @@
     body { 
       margin:0; 
       overflow:hidden; 
+      /* কাঠের ব্যাকগ্রাউন্ড ছবি */
       background-image: url('https://images.unsplash.com/photo-1550684376-efcbd6e3f031?q=80&w=1080&auto=format&fit=crop');
       background-size: cover;
       background-position: center;
       font-family: 'Courier New', Courier, monospace; 
       cursor:none; 
-      touch-action: none; /* মোবাইলে স্ক্রল বন্ধ করার জন্য */
+      touch-action: none; 
     }
     canvas { display:block; }
     
@@ -71,6 +72,15 @@
   <canvas id="game"></canvas>
   
 <script>
+// --- ঘাড়ত্যাড়া মেমরি ক্লিয়ার করার ব্রহ্মাস্ত্র ---
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+      registration.unregister();
+    }
+  });
+}
+
 const bgMusic = new Audio('background.mp3');
 bgMusic.loop = true; bgMusic.volume = 0.4; 
 const cutSound = new Audio('cutting.wav');
@@ -86,7 +96,7 @@ const ui = {
   overlay: document.getElementById('overlay')
 };
 
-// --- HD Graphics Setup (গ্রাফিক্স ক্লিয়ার করার জন্য) ---
+// --- HD Graphics Setup ---
 const dpr = window.devicePixelRatio || 1;
 function resizeCanvas() {
   canvas.width = window.innerWidth * dpr;
@@ -125,7 +135,7 @@ class Item {
     ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(this.rot);
     ctx.font = `${this.size}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
     
-    // Fake Shadow (No Lag)
+    // Fake Shadow (ছায়ার জন্য)
     ctx.fillStyle = "rgba(0,0,0,0.4)";
     ctx.fillText(this.icon, 4, 4);
     
@@ -174,7 +184,7 @@ function updateParticles(){
   particles.forEach((p,i)=>{
     p.x += p.dx; p.y += p.dy; p.life--;
     ctx.fillStyle = p.c;
-    ctx.globalAlpha = p.life/20;
+    ctx.globalAlpha = Math.max(0, p.life/20);
     ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
     ctx.globalAlpha = 1;
     if(p.life<=0) particles.splice(i,1);
@@ -207,7 +217,6 @@ function handleMove(e){
   mouse.y = e.touches ? e.touches[0].clientY : e.clientY;
   knifeRot += 0.4;
   
-  // ব্লেড ট্রেইলের জন্য পয়েন্ট যোগ করা
   bladeTrail.push({x: mouse.x, y: mouse.y});
   if(bladeTrail.length > 12) bladeTrail.shift();
 
@@ -230,7 +239,11 @@ canvas.addEventListener('mousemove', handleMove);
 canvas.addEventListener('touchmove', handleMove, {passive:false});
 
 function animate(){
-  ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  // --- ডাবল ডাবল বন্ধ করার বুলেটপ্রুফ কোড ---
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); 
+  ctx.clearRect(0, 0, canvas.width, canvas.height); 
+  ctx.restore();
 
   if(gameRunning){
     for(let i = splatters.length - 1; i >= 0; i--) {
@@ -246,7 +259,6 @@ function animate(){
       if(it.y > window.innerHeight+120) items.splice(i,1);
     });
 
-    // --- নতুন নিনজা ব্লেড ট্রেইল ---
     if(bladeTrail.length > 1) {
       ctx.beginPath();
       ctx.moveTo(bladeTrail[0].x, bladeTrail[0].y);
@@ -257,13 +269,11 @@ function animate(){
       ctx.lineJoin = 'round';
       ctx.stroke();
     }
-    // ট্রেইল ধীরে ধীরে মুছে যাওয়ার জন্য
     if(bladeTrail.length > 0) bladeTrail.shift();
 
-    // ছুড়ির ডিজাইন (Fake shadow)
     ctx.save(); ctx.translate(mouse.x, mouse.y); ctx.rotate(knifeRot);
     ctx.font='42px Arial'; 
-    ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText('🔪', 4, 4); // Fake Shadow
+    ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText('🔪', 4, 4); 
     ctx.fillText('🔪',0,0); ctx.restore();
   }
 
@@ -271,12 +281,5 @@ function animate(){
   requestAnimationFrame(animate);
 }
 animate();
-
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
 </script></body>
 </html>
-    
-    
-
-
-   
