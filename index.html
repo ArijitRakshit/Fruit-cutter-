@@ -6,27 +6,26 @@
 <meta name="theme-color" content="#5c3a21">
   
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fruit Cutter Pro Extreme</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fruit Cutter Pro Extreme HD</title>
   <style>
     body { 
       margin:0; 
       overflow:hidden; 
-      /* --- কাঠের ব্যাকগ্রাউন্ড ছবি --- */
       background-image: url('https://images.unsplash.com/photo-1550684376-efcbd6e3f031?q=80&w=1080&auto=format&fit=crop');
       background-size: cover;
       background-position: center;
       font-family: 'Courier New', Courier, monospace; 
       cursor:none; 
+      touch-action: none; /* মোবাইলে স্ক্রল বন্ধ করার জন্য */
     }
     canvas { display:block; }
     
-    /* --- নতুন কাঠের UI বক্সের ডিজাইন --- */
     #ui { 
       position:absolute; 
       top:15px; 
       left:15px; 
-      background: linear-gradient(135deg, #6d4c41, #3e2723); /* কাঠের রং */
+      background: linear-gradient(135deg, #6d4c41, #3e2723);
       border: 3px solid #8d6e63;
       border-radius: 12px;
       padding: 15px 20px;
@@ -63,7 +62,7 @@
   </div>
   
   <div id="menu">
-    <h1>🍉 Fruit Cutter Pro</h1>
+    <h1>🍉 Fruit Cutter Pro HD</h1>
     <p style="font-size: 18px; color:#ffcc80; font-weight:bold;">Time Attack: 60 Seconds!</p>
     <button onclick="startGame()">▶ Start Game</button>
   </div>
@@ -72,7 +71,6 @@
   <canvas id="game"></canvas>
   
 <script>
-// --- সাউন্ড ফাইল ---
 const bgMusic = new Audio('background.mp3');
 bgMusic.loop = true; bgMusic.volume = 0.4; 
 const cutSound = new Audio('cutting.wav');
@@ -87,36 +85,36 @@ const ui = {
   menu: document.getElementById('menu'),
   overlay: document.getElementById('overlay')
 };
-canvas.width = innerWidth; canvas.height = innerHeight;
 
-// --- গেম ভেরিয়েবল ---
+// --- HD Graphics Setup (গ্রাফিক্স ক্লিয়ার করার জন্য) ---
+const dpr = window.devicePixelRatio || 1;
+function resizeCanvas() {
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.scale(dpr, dpr);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
 let score=0, best=+localStorage.getItem('fruit_best')||0;
 let timeLeft = 60, timerInterval;
-let items=[], particles=[], splatters=[], combo=0, gameRunning=false, mouse={x:0,y:0}, knifeRot=0;
+let items=[], particles=[], splatters=[], bladeTrail=[], combo=0, gameRunning=false, mouse={x:0,y:0}, knifeRot=0;
 ui.best.textContent = best;
 
 const fruits=['🍎','🍉','🍓','🥭','🍍','🥝'];
-
-// ফলের রসের রং (Dynamic Colors)
-const fruitColors = {
-  '🍎': '#e53935', // লাল
-  '🍉': '#ff1744', // গাঢ় গোলাপী/লাল
-  '🍓': '#d50000', // স্ট্রবেরি লাল
-  '🥭': '#ffb300', // আম হলুদ/কমলা
-  '🍍': '#fdd835', // আনারস হলুদ
-  '🥝': '#7cb342'  // কিউই সবুজ
-};
+const fruitColors = { '🍎': '#e53935', '🍉': '#ff1744', '🍓': '#d50000', '🥭': '#ffb300', '🍍': '#fdd835', '🥝': '#7cb342' };
 
 class Item {
   constructor(){
-    // লেভেলের জায়গায় সময়ের সাথে স্পিড বাড়বে
     let difficulty = (60 - timeLeft) / 60; 
     this.isBomb = Math.random() < 0.1 + (difficulty * 0.1);
     this.boss = Math.random() < 0.05;
     this.icon = this.isBomb ? '💣' : (this.boss ? '🍉' : fruits[Math.floor(Math.random()*fruits.length)]);
     this.size = this.boss ? 110 : Math.max(45, 80 - (difficulty * 20));
-    this.x = Math.random()*(canvas.width-100)+50;
-    this.y = canvas.height+50;
+    this.x = Math.random()*(window.innerWidth-100)+50;
+    this.y = window.innerHeight+50;
     this.vx = (Math.random()-0.5)*(3 + difficulty*2);
     this.vy = -(10 + Math.random()*3 + difficulty*3);
     this.g = 0.18 + (difficulty*0.05);
@@ -125,93 +123,78 @@ class Item {
   update(){ this.vy += this.g; this.x += this.vx; this.y += this.vy; this.rot += this.rv; }
   draw(){
     ctx.save(); ctx.translate(this.x,this.y); ctx.rotate(this.rot);
-    ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 10; ctx.shadowOffsetX = 5; ctx.shadowOffsetY = 5;
     ctx.font = `${this.size}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(this.icon,0,0); ctx.restore();
+    
+    // Fake Shadow (No Lag)
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillText(this.icon, 4, 4);
+    
+    // Main Icon
+    ctx.fillText(this.icon, 0, 0); 
+    ctx.restore();
   }
 }
 
-// --- ফলের রসের দাগ (Juice Splatter) ক্লাস ---
 class Splatter {
   constructor(x, y, fruitIcon, isCombo) {
     this.x = x; this.y = y;
     this.color = fruitColors[fruitIcon] || '#ff0000';
-    // কম্বো হলে ২ সেকেন্ড (১২০ ফ্রেম), নরমাল হলে ১.৩ সেকেন্ড (৮০ ফ্রেম)
-    this.life = isCombo ? 120 : 80; 
+    this.life = isCombo ? 100 : 60; 
     this.maxLife = this.life;
-    // কম্বো হলে দাগ বড় হবে
-    this.radius = isCombo ? Math.random() * 25 + 30 : Math.random() * 15 + 15;
-    
-    // দাগের চারপাশের ছোট ছোট ছিটকে পড়া রস
+    this.radius = isCombo ? Math.random() * 20 + 25 : Math.random() * 15 + 10;
     this.drops = [];
-    let dropCount = isCombo ? 10 : 5;
+    let dropCount = isCombo ? 8 : 4;
     for(let i=0; i<dropCount; i++) {
       this.drops.push({
-        dx: (Math.random()-0.5) * (isCombo ? 80 : 50),
-        dy: (Math.random()-0.5) * (isCombo ? 80 : 50),
-        r: Math.random() * 8 + 3
+        dx: (Math.random()-0.5) * (isCombo ? 60 : 40),
+        dy: (Math.random()-0.5) * (isCombo ? 60 : 40),
+        r: Math.random() * 6 + 2
       });
     }
   }
   draw() {
-    let opacity = (this.life / this.maxLife) * 0.8; // কম্বো হলে রং গাঢ় হবে
+    let opacity = (this.life / this.maxLife) * 0.7; 
     ctx.save();
     ctx.globalAlpha = Math.max(0, opacity);
     ctx.fillStyle = this.color;
-    
-    // মেইন দাগ
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // ছোট রসগুলো
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
     this.drops.forEach(d => {
-      ctx.beginPath();
-      ctx.arc(this.x + d.dx, this.y + d.dy, d.r, 0, Math.PI*2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(this.x + d.dx, this.y + d.dy, d.r, 0, Math.PI*2); ctx.fill();
     });
     ctx.restore();
     this.life--;
   }
 }
 
-function spawnParticles(x,y){
-  for(let i=0;i<12;i++) particles.push({x,y,dx:Math.random()*8-4,dy:Math.random()*8-4,life:30});
+function spawnParticles(x,y, color){
+  for(let i=0;i<8;i++) particles.push({x,y,dx:Math.random()*8-4,dy:Math.random()*8-4,life:20, c:color});
 }
 
 function updateParticles(){
   particles.forEach((p,i)=>{
     p.x += p.dx; p.y += p.dy; p.life--;
-    ctx.font='18px Arial'; ctx.fillText('✨', p.x, p.y);
+    ctx.fillStyle = p.c;
+    ctx.globalAlpha = p.life/20;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
     if(p.life<=0) particles.splice(i,1);
   });
 }
 
-// --- টাইমার ও গেম ওভার লজিক ---
 function startGame(){
-  ui.menu.style.display='none';
-  ui.overlay.style.display='none';
-  score=0; combo=0; timeLeft=60; items=[]; particles=[]; splatters=[]; gameRunning=true;
-  ui.score.textContent = score;
-  ui.time.textContent = timeLeft;
-  
-  bgMusic.currentTime = 0;
-  bgMusic.play().catch(e => console.log("Audio ready:", e));
-
-  // ঘড়ি চলা শুরু
+  ui.menu.style.display='none'; ui.overlay.style.display='none';
+  score=0; combo=0; timeLeft=60; items=[]; particles=[]; splatters=[]; bladeTrail=[]; gameRunning=true;
+  ui.score.textContent = score; ui.time.textContent = timeLeft;
+  bgMusic.currentTime = 0; bgMusic.play().catch(e => console.log(e));
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
-    timeLeft--;
-    ui.time.textContent = timeLeft;
+    timeLeft--; ui.time.textContent = timeLeft;
     if(timeLeft <= 0) gameOver("⏰ Time's Up!");
   }, 1000);
 }
 
 function gameOver(reason = "💥 Boom!"){
-  gameRunning=false;
-  clearInterval(timerInterval);
-  bgMusic.pause();
-  
+  gameRunning=false; clearInterval(timerInterval); bgMusic.pause();
   if(score>best){ best=score; localStorage.setItem('fruit_best', best); ui.best.textContent=best; }
   ui.overlay.style.display='flex';
   ui.overlay.innerHTML = `<h1>${reason}</h1><p>Final Score: ${score}<br>Best Score: ${best}</p><button onclick="startGame()">🔁 Play Again</button>`;
@@ -223,28 +206,22 @@ function handleMove(e){
   mouse.x = e.touches ? e.touches[0].clientX : e.clientX;
   mouse.y = e.touches ? e.touches[0].clientY : e.clientY;
   knifeRot += 0.4;
+  
+  // ব্লেড ট্রেইলের জন্য পয়েন্ট যোগ করা
+  bladeTrail.push({x: mouse.x, y: mouse.y});
+  if(bladeTrail.length > 12) bladeTrail.shift();
 
   items.forEach((it,i)=>{
     if(Math.hypot(it.x-mouse.x,it.y-mouse.y) < it.size/1.5){
-      if(it.isBomb) {
-        boomSound.currentTime = 0; boomSound.play();
-        return gameOver("💥 Boom!");
-      }
-      
+      if(it.isBomb) { boomSound.currentTime = 0; boomSound.play(); return gameOver("💥 Boom!"); }
       cutSound.currentTime = 0; cutSound.play();
-      
-      // কম্বো চেক এবং ফলের রসের দাগ তৈরি
       let isComboCut = combo > 0;
+      let fColor = fruitColors[it.icon] || '#fff';
       splatters.push(new Splatter(it.x, it.y, it.icon, isComboCut));
-      
-      spawnParticles(it.x,it.y);
-      items.splice(i,1);
-      combo++;
-      score += 10 + combo*5 + (it.boss ? 50 : 0);
+      spawnParticles(it.x,it.y, fColor);
+      items.splice(i,1); combo++; score += 10 + combo*5 + (it.boss ? 50 : 0);
       ui.score.textContent = score;
-      
-      clearTimeout(window.comboReset);
-      window.comboReset = setTimeout(()=>combo=0, 400); // 400ms এর মধ্যে কাটলে কম্বো
+      clearTimeout(window.comboReset); window.comboReset = setTimeout(()=>combo=0, 400); 
     }
   });
 }
@@ -253,31 +230,41 @@ canvas.addEventListener('mousemove', handleMove);
 canvas.addEventListener('touchmove', handleMove, {passive:false});
 
 function animate(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
 
   if(gameRunning){
-    // ফলের রসের দাগগুলো সবার আগে আঁকা হবে (যাতে কাঠের গায়ে লেপ্টে থাকে)
     for(let i = splatters.length - 1; i >= 0; i--) {
       splatters[i].draw();
       if(splatters[i].life <= 0) splatters.splice(i, 1);
     }
 
-    // ফল বেরোনোর স্পিড (সময়ের সাথে সাথে বাড়বে)
     let spawnRate = 0.03 + ((60 - timeLeft)/60)*0.04;
     if(Math.random() < spawnRate) items.push(new Item());
     
     items.forEach((it,i)=>{
       it.update(); it.draw();
-      if(it.y > canvas.height+120) items.splice(i,1);
+      if(it.y > window.innerHeight+120) items.splice(i,1);
     });
 
-    // ছুড়ির ডিজাইন
-    ctx.save();
-    ctx.translate(mouse.x, mouse.y);
-    ctx.rotate(knifeRot);
-    ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 10;
-    ctx.font='42px Arial'; ctx.fillText('🔪',0,0);
-    ctx.restore();
+    // --- নতুন নিনজা ব্লেড ট্রেইল ---
+    if(bladeTrail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(bladeTrail[0].x, bladeTrail[0].y);
+      for(let i=1; i<bladeTrail.length; i++) ctx.lineTo(bladeTrail[i].x, bladeTrail[i].y);
+      ctx.strokeStyle = 'rgba(255, 77, 136, 0.8)';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    // ট্রেইল ধীরে ধীরে মুছে যাওয়ার জন্য
+    if(bladeTrail.length > 0) bladeTrail.shift();
+
+    // ছুড়ির ডিজাইন (Fake shadow)
+    ctx.save(); ctx.translate(mouse.x, mouse.y); ctx.rotate(knifeRot);
+    ctx.font='42px Arial'; 
+    ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText('🔪', 4, 4); // Fake Shadow
+    ctx.fillText('🔪',0,0); ctx.restore();
   }
 
   updateParticles();
@@ -285,8 +272,11 @@ function animate(){
 }
 animate();
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
-}
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
 </script></body>
 </html>
+    
+    
+
+
+   
