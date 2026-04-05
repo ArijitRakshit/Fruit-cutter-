@@ -30,7 +30,18 @@
     <button onclick="startGame()">▶ Start Game</button>
   </div>
   <div id="overlay" style="display:none"></div>
-  <canvas id="game"></canvas><script>
+  <canvas id="game"></canvas>
+  
+<script>
+// --- সাউন্ড ফাইলগুলো লোড করা হচ্ছে ---
+const bgMusic = new Audio('background.mp3');
+bgMusic.loop = true; // মিউজিক বারবার বাজবে
+bgMusic.volume = 0.4; // সাউন্ড একটু কমিয়ে রাখা হলো
+
+const cutSound = new Audio('cutting.wav');
+const boomSound = new Audio('boom.wav');
+// -------------------------------------
+
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const ui = {
@@ -85,10 +96,18 @@ function startGame(){
   ui.menu.style.display='none';
   ui.overlay.style.display='none';
   level=1; score=0; combo=0; items=[]; particles=[]; gameRunning=true;
+  
+  // --- গেম শুরু হলে ব্যাকগ্রাউন্ড মিউজিক বাজবে ---
+  bgMusic.currentTime = 0;
+  bgMusic.play().catch(e => console.log("Audio ready:", e));
 }
 
 function gameOver(){
   gameRunning=false;
+  
+  // --- গেম ওভার হলে মিউজিক থেমে যাবে ---
+  bgMusic.pause();
+  
   if(level>best){ best=level; localStorage.setItem('fruit_best', best); ui.best.textContent=best; }
   ui.overlay.style.display='flex';
   ui.overlay.innerHTML = `<h1>💥 Game Over</h1><p>Final Level: ${level}<br>Score: ${score}</p><button onclick="startGame()">🔁 Restart</button>`;
@@ -103,7 +122,17 @@ function handleMove(e){
 
   items.forEach((it,i)=>{
     if(Math.hypot(it.x-mouse.x,it.y-mouse.y) < it.size/1.5){
-      if(it.isBomb) return gameOver();
+      if(it.isBomb) {
+        // --- বোম কাটলে সাউন্ড বাজবে ---
+        boomSound.currentTime = 0;
+        boomSound.play();
+        return gameOver();
+      }
+      
+      // --- ফল কাটলে সাউন্ড বাজবে ---
+      cutSound.currentTime = 0; 
+      cutSound.play();
+      
       spawnParticles(it.x,it.y);
       items.splice(i,1);
       combo++;
@@ -149,4 +178,3 @@ animate();
 
 </script></body>
 </html>
-
